@@ -19,7 +19,7 @@
 
 1. Клонируйте репозиторий:
 ```bash
-git clone <repository-url>
+git clone https://github.com/viceforever/tg-bot.git
 cd tg-bot
 ```
 
