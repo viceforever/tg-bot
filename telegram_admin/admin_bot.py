@@ -40,7 +40,7 @@ class AdminBot:
 
 Примеры:
 /export -5148403988 1 - Экспорт за последний день
-/export_date -5148403988 2025-01-01 2025-01-31 - Экспорт за период
+/export_date -5148403988 2026-01-01 2026-01-31 - Экспорт за период
 /files -5148403988 7 - Получить файлы за последние 7 дней
         """
         await update.message.reply_text(welcome_text)
@@ -186,7 +186,7 @@ class AdminBot:
                 await update.message.reply_text(
                     "Использование: /export_date <chat_id> <start_date> <end_date>\n"
                     "Формат даты: YYYY-MM-DD\n"
-                    "Пример: /export_date 123456789 2025-01-01 2025-01-31"
+                    "Пример: /export_date 123456789 2026-01-01 2026-01-31"
                 )
                 return
             
