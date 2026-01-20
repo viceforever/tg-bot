@@ -266,7 +266,7 @@ class DatabaseManager:
     def save_document(self, message_db_id: int, file_id: str, 
                      file_unique_id: str = None, file_name: str = None,
                      mime_type: str = None, file_size: int = None,
-                     document_type: str = None) -> Document:
+                     document_type: str = None, file_path: str = None) -> Document:
         """Сохранение документа/файла"""
         session = self.get_session()
         try:
@@ -277,7 +277,8 @@ class DatabaseManager:
                 file_name=file_name,
                 mime_type=mime_type,
                 file_size=file_size,
-                document_type=document_type
+                document_type=document_type,
+                file_path=file_path
             )
             session.add(document)
             session.commit()

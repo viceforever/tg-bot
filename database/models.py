@@ -82,6 +82,7 @@ class Document(Base):
     mime_type = Column(String(100), nullable=True)
     file_size = Column(Integer, nullable=True)
     document_type = Column(String(50), nullable=True)  # 'photo', 'document', 'video', 'audio', 'voice', 'sticker'
+    file_path = Column(String(500), nullable=True)  # Локальный путь к скачанному файлу
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Связи

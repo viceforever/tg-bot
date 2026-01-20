@@ -36,10 +36,12 @@ class AdminBot:
 /chats - Список всех чатов
 /export <chat_id> <days> - Экспорт сообщений за последние N дней
 /export_date <chat_id> <start_date> <end_date> - Экспорт за период (формат: YYYY-MM-DD)
+/files <chat_id> <days> - Получить файлы за последние N дней
 
 Примеры:
 /export -5148403988 1 - Экспорт за последний день
 /export_date -5148403988 2025-01-01 2025-01-31 - Экспорт за период
+/files -5148403988 7 - Получить файлы за последние 7 дней
         """
         await update.message.reply_text(welcome_text)
     
@@ -269,9 +271,21 @@ class AdminBot:
             if msg.documents:
                 export_lines.append("Файлы:")
                 for doc in msg.documents:
-                    doc_info = f"  - {doc.document_type}: {doc.file_name or doc.file_id}"
+                    # Показываем имя файла или тип, если имени нет
+                    display_name = doc.file_name or f"{doc.document_type}"
+                    doc_info = f"  - [{doc.document_type}] {display_name}"
                     if doc.file_size:
-                        doc_info += f" ({doc.file_size} байт)"
+                        # Форматируем размер файла
+                        size_kb = doc.file_size / 1024
+                        if size_kb > 1024:
+                            doc_info += f" ({size_kb/1024:.1f} МБ)"
+                        else:
+                            doc_info += f" ({size_kb:.1f} КБ)"
+                    # Показываем путь к файлу на диске
+                    if doc.file_path:
+                        doc_info += f"\n    📁 Путь: {doc.file_path}"
+                    else:
+                        doc_info += f"\n    ⚠️ Файл не скачан (file_id: {doc.file_id[:20]}...)"
                     export_lines.append(doc_info)
             
             # Проверяем наличие реакций
@@ -297,6 +311,97 @@ class AdminBot:
         
         return "\n".join(export_lines)
     
+    async def files_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Обработчик команды /files - отправка файлов за период"""
+        if not self.is_admin(update.effective_user.id):
+            await update.message.reply_text("У вас нет доступа к этой команде.")
+            return
+        
+        try:
+            args = context.args
+            if len(args) < 2:
+                await update.message.reply_text(
+                    "Использование: /files <chat_id> <days>\n"
+                    "Пример: /files -5148403988 7"
+                )
+                return
+            
+            chat_id = int(args[0])
+            days = int(args[1])
+            
+            end_date = datetime.utcnow()
+            start_date = end_date - timedelta(days=days)
+            
+            # Получаем сообщения с документами
+            messages = self.db_manager.get_messages_by_date_range(chat_id, start_date, end_date)
+            
+            # Если не найдено и ID положительный, пробуем отрицательный
+            if not messages and chat_id > 0:
+                messages = self.db_manager.get_messages_by_date_range(-chat_id, start_date, end_date)
+                if messages:
+                    chat_id = -chat_id
+            
+            if not messages:
+                await update.message.reply_text(
+                    f"Сообщения не найдены в чате {chat_id} за последние {days} дней."
+                )
+                return
+            
+            # Собираем все файлы
+            files_to_send = []
+            for msg in messages:
+                if msg.documents:
+                    for doc in msg.documents:
+                        if doc.file_path and os.path.exists(doc.file_path):
+                            files_to_send.append({
+                                'path': doc.file_path,
+                                'name': doc.file_name or os.path.basename(doc.file_path),
+                                'type': doc.document_type,
+                                'date': msg.message_date
+                            })
+            
+            if not files_to_send:
+                await update.message.reply_text(
+                    f"Файлы не найдены в чате {chat_id} за последние {days} дней.\n"
+                    "Возможно, файлы ещё не были скачаны (они скачиваются при получении новых сообщений)."
+                )
+                return
+            
+            await update.message.reply_text(
+                f"📁 Найдено файлов: {len(files_to_send)}\n"
+                f"Отправляю..."
+            )
+            
+            # Отправляем файлы (максимум 10 за раз, чтобы не превысить лимиты)
+            sent_count = 0
+            for file_info in files_to_send[:50]:  # Ограничиваем 50 файлами
+                try:
+                    with open(file_info['path'], 'rb') as f:
+                        caption = f"📅 {file_info['date'].strftime('%Y-%m-%d %H:%M')}\n📎 {file_info['type']}"
+                        await update.message.reply_document(
+                            document=f,
+                            filename=file_info['name'],
+                            caption=caption
+                        )
+                        sent_count += 1
+                except Exception as e:
+                    await update.message.reply_text(
+                        f"⚠️ Не удалось отправить файл {file_info['name']}: {e}"
+                    )
+            
+            if len(files_to_send) > 50:
+                await update.message.reply_text(
+                    f"✅ Отправлено {sent_count} из {len(files_to_send)} файлов.\n"
+                    f"⚠️ Показаны первые 50 файлов. Используйте меньший период для получения остальных."
+                )
+            else:
+                await update.message.reply_text(f"✅ Отправлено файлов: {sent_count}")
+        
+        except ValueError:
+            await update.message.reply_text("Ошибка: неверный формат аргументов.")
+        except Exception as e:
+            await update.message.reply_text(f"Ошибка при получении файлов: {e}")
+    
     def get_handlers(self):
         """Получение обработчиков команд для бота"""
         return [
@@ -304,5 +409,6 @@ class AdminBot:
             CommandHandler("chats", self.chats_command),
             CommandHandler("export", self.export_command),
             CommandHandler("export_date", self.export_date_command),
+            CommandHandler("files", self.files_command),
         ]
 

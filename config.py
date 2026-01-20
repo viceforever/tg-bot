@@ -22,6 +22,9 @@ class Config:
     DB_USER = os.getenv("DB_USER", "postgres")
     DB_PASSWORD = os.getenv("DB_PASSWORD", "")
     
+    # Путь для хранения скачанных файлов
+    DOWNLOAD_PATH = os.getenv("DOWNLOAD_PATH", os.path.join(os.path.dirname(os.path.abspath(__file__)), "downloads"))
+    
     @property
     def DATABASE_URL(self):
         """Формирует URL для подключения к базе данных"""
